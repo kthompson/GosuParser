@@ -1,4 +1,4 @@
-# GosuParser
+# GosuParser [![NuGet Version](http://img.shields.io/nuget/v/GosuParser.svg?style=flat)](https://www.nuget.org/packages/GosuParser/) 
 
 A parser combinator library for .net
 
