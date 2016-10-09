@@ -4,33 +4,42 @@ using System.Linq;
 
 namespace GosuParser
 {
+    public delegate Result<T> Parser<T>(InputState InputState);
+
     public static partial class Parser
     {
-
-        public static Parser<T> Create<T>(string label, Func<InputState, Result<T>> fn) =>
-            new Parser<T>(label, fn);
+        public static Parser<T> Create<T>(Func<InputState, Result<T>> fn) => input => fn(input);
 
         public static Parser<T> Choice<T>(this IEnumerable<Parser<T>> items) =>
             items.Aggregate((parser, parser1) => parser.OrElse(parser1));
 
+
+        public static Result<T> Run<T>(this Parser<T> parser, InputState input) => parser(input);
+
         public static Result<T> Run<T>(this Parser<T> parser, string input) =>
-            parser.Run(InputState.FromString(input));
+            parser(InputState.FromString(input));
         
-        // .>>.
         public static Parser<Tuple<T1, T2>> AndThen<T1, T2>(this Parser<T1> parser, Parser<T2> parser2) =>
             from p1 in parser
             from p2 in parser2
             select Tuple.Create(p1, p2);
 
-        public static Parser<T> OrElse<T>(this Parser<T> parser, Parser<T> parser2) =>
-            Create($"{parser.Label} orElse {parser2.Label}",
-                input => parser.Run(input).Match(
-                    (_, __, ___) => parser2.Run(input),
-                    Result.Success));
+        public static Parser<Tuple<T1, T2, T3>> AndThen<T1, T2, T3>(this Parser<Tuple<T1, T2>> parser, Parser<T3> parser2) =>
+            from p1 in parser
+            from p2 in parser2
+            select Tuple.Create(p1.Item1, p1.Item2, p2);
 
-        // mapP |>>
-        // val mapP : f:('a -> 'b) -> Parser<'a> -> Parser<'b>
-        // val Select : Parser<'a> -> f:('a -> 'b) -> Parser<'b>
+        public static Parser<Tuple<T1, T2, T3, T4>> AndThen<T1, T2, T3, T4>(
+            this Parser<Tuple<T1, T2, T3>> parser, Parser<T4> parser2) =>
+                from p1 in parser
+                from p2 in parser2
+                select Tuple.Create(p1.Item1, p1.Item2, p1.Item3, p2);
+
+        public static Parser<T> OrElse<T>(this Parser<T> parser, Parser<T> parser2) =>
+            input => parser(input).Match(
+                _ => parser2(input),
+                Result.Success);
+
         public static Parser<TResult> Select<T, TResult>(
             this Parser<T> parser,
             Func<T, TResult> func) =>
@@ -49,37 +58,19 @@ namespace GosuParser
                         Return(resultSelector(t, tp))));
 
         public static Parser<TResult> Bind<T, TResult>(this Parser<T> p, Func<T, Parser<TResult>> f) =>
-            Create("unknown", input => p
-                .Run(input)
+            input => p(input)
                 .Match(
-                    Result.Failure<TResult>,
-                    (value1, remainingInput) => f(value1).Run(remainingInput)));
+                    failure => Result.FromFailure<T, TResult>(failure),
+                    (value1, remainingInput) => f(value1)(remainingInput));
 
         //returnP <>
-        public static Parser<T> Return<T>(this T obj) =>
-            Create(obj.ToString(), 
-                input => Result.Success(obj, input));
+        public static Parser<T> Return<T>(this T obj) => input => Result.Success(obj, input);
 
         private static Func<Parser<T1>, Parser<T2>> Lift2<T1, T2>(Func<T1, T2> f) =>
             pT1 => f.Return().Apply(pT1);
 
         public static Func<Parser<T1>, Parser<T2>, Parser<T3>> Lift2<T1, T2, T3>(Func<T1, T2, T3> f) =>
             (pT1, pT2) => f.Return().Apply(pT1).Apply(pT2);
-
-        //public static IEnumerable<TResult> SelectMany<TSource, TCollection, TResult>(
-        //    this IEnumerable<TSource> source, 
-        //    Func<TSource, Parser<TCollection>> collectionSelector,
-        //    Func<TSource, TCollection, TResult> resultSelector)
-        //{
-
-        //}
-
-        //public static Parser<TResult> SelectMany<TSource, TResult>(
-        //    this IEnumerable<TSource> source,
-        //    Func<TSource, Parser<TResult>> selector)
-        //{
-
-        //}
 
         // sequence
         public static Parser<IEnumerable<T>> ToSequence<T>(this IEnumerable<Parser<T>> enumerable)
@@ -114,7 +105,7 @@ namespace GosuParser
             parser
                 .Run(input)
                 .Match(
-                    (_, __, ___) => new Success<IEnumerable<T>>(new List<T>(), input),
+                    _ => new Success<IEnumerable<T>>(new List<T>(), input),
                     (firstValue, inputAfterFirstParse) =>
                     {
                         var result2 = ParseZeroOrMore(parser, inputAfterFirstParse);
@@ -124,8 +115,7 @@ namespace GosuParser
                     });
 
         public static Parser<IEnumerable<T>> ZeroOrMore<T>(this Parser<T> parser) =>
-            Create($"many {parser.Label}", 
-                input => ParseZeroOrMore(parser, input));
+            input => ParseZeroOrMore(parser, input);
 
         public static Parser<IEnumerable<T>> OneOrMore<T>(this Parser<T> parser) =>
             from head in parser
@@ -177,24 +167,8 @@ namespace GosuParser
             parser.WithLabel(label);
 
         public static Parser<T1> WithLabel<T1>(this Parser<T1> parser, string label) =>
-            Create(label, input => parser
-                .Run(input)
-                .Match((oldLabel, err, pos) => Result.Failure<T1>(label, err, pos),
-                    Result.Success));
-    }
-
-    public class Parser<T>
-    {
-        private readonly Func<InputState, Result<T>> _parseFunc;
-        public string Label { get; }
-
-        public Parser(string label, Func<InputState, Result<T>> fn)
-        {
-            this._parseFunc = fn;
-            this.Label = label;
-        }
-
-        public Result<T> Run(InputState input) =>
-            this._parseFunc(input);
+            input => parser(input)
+                .Match(failure => Result.Failure<T1>(label, failure.FailureText, failure.Position),
+                    Result.Success);
     }
 }

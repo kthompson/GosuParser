@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Runtime.Remoting.Messaging;
 
 namespace GosuParser
 {

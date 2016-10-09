@@ -1,17 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Xunit;
 using static GosuParser.Parser;
 
 namespace GosuParser.Tests
 {
-    // http://fsharpforfunandprofit.com/posts/understanding-parser-combinators-3/
     public class CharParserTests
     {
         [Fact]
@@ -22,8 +16,6 @@ namespace GosuParser.Tests
             AssertSuccess(parser, "ABC", "BC", c => Assert.Equal('A', c));
             AssertFailure(parser, "ZBC", "Line:0 Col:0 Error parsing 'A'\nZBC\n^ Unexpected 'Z'");
         }
-
-
 
         [Fact]
         public void AndThenCombineParsers()
@@ -103,7 +95,7 @@ namespace GosuParser.Tests
                 parseDigit
                     .AndThen(parseDigit)
                     .AndThen(parseDigit)
-                    .Select(x => new string(new[] {x.Item1.Item1, x.Item1.Item2, x.Item2}));
+                    .Select(x => new string(new char[] {x.Item1, x.Item2, x.Item3}));
 
             AssertSuccess(parseThreeDigitsAsStr, "123A", "A", s => Assert.Equal("123", s));
 
@@ -399,22 +391,100 @@ namespace GosuParser.Tests
         [Fact]
         public void TestFailureResult()
         {
-            var failure = Result.Failure<int>("identifier", "unexpected |", new ParserPosition(
+            var failure = Result.Failure<int>("", "unexpected |", new Position(
                 "123 ab|cd", 1, 6));
 
             var text = failure.ToString();
-            Assert.Equal("Line:1 Col:6 Error parsing identifier\n123 ab|cd\n------^ unexpected |", text);
+            Assert.Equal("Line:1 Col:6 Error parsing:\n123 ab|cd\n------^ unexpected |", text);
+        }
+
+        [Fact]
+        public void TestFailureResult2()
+        {
+            var failure = Result.Failure<int>("taco", "unexpected |", new Position(
+                "123 ab|cd", 1, 6));
+
+            var text = failure.ToString();
+            Assert.Equal("Line:1 Col:6 Error parsing taco\n123 ab|cd\n------^ unexpected |", text);
+        }
+
+
+        [Fact]
+        public void BasicStringTest()
+        {
+            var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many()
+                          select new string(chars.ToArray());
+
+
+            AssertSuccess(jstring, @"hello", res => Assert.Equal("hello", res));
+        }
+
+
+        [Fact]
+        public void JsonStringTest()
+        {
+            var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
+                          select new string(chars.ToArray());
+
+
+            AssertSuccess(jstring, @"""hello""", res => Assert.Equal("hello", res));
+        }
+
+        [Fact]
+        public void JsonKeyPairTest()
+        {
+            var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
+                          select new string(chars.ToArray());
+            var key = jstring.WithLabel("key");
+            jstring = jstring.WithLabel("value");
+            var keyPair = key.TakeLeft(String(":")).AndThen(jstring).WithLabel("KeyPair");
+
+            AssertSuccess(keyPair, "\"x\":\"5\"", result =>
+            {
+                Assert.NotNull(result);
+
+                Assert.Equal("x", result.Item1);
+                Assert.Equal("5", result.Item2);
+            });
+        }
+
+        [Fact]
+        public void JsonKeyPairsTest()
+        {
+
+            var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
+                          select new string(chars.ToArray());
+            var key = jstring.WithLabel("key");
+            jstring = jstring.WithLabel("value");
+            var keyPair = key.TakeLeft(String(":")).AndThen(jstring).WithLabel("KeyPair");
+            var keyPairs = keyPair.SepBy(String(","));
+
+            AssertSuccess(keyPairs, "\"x\":\"5\",\"a\":\"hello\"", result =>
+            {
+                Assert.NotNull(result);
+                Assert.Collection(result, tuple =>
+                {
+                    Assert.Equal("x", tuple.Item1);
+                    Assert.Equal("5", tuple.Item2);
+                }, tuple =>
+                {
+                    Assert.Equal("a", tuple.Item1);
+                    Assert.Equal("hello", tuple.Item2);
+                });
+            });
         }
 
         [Fact]
         public void JsonTest()
         {
-            Parser<object> jvalue = null;
+            Action<Parser<object>> assignment;
+            Parser<object> jvalue = CreateParserForwardedToRef(out assignment);
 
-            var jstring = from chars in Satisfy(c => c != '"' || c != '\\', "string").Many().Between(Char('"'), Char('"'))
+            var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
                           select new string(chars.ToArray());
             var key = jstring.WithLabel("key");
-            var keyPair = key.TakeLeft(String(":")).AndThen(jvalue);
+            jstring = jstring.WithLabel("string");
+            var keyPair = key.TakeLeft(String(":")).AndThen(jvalue).WithLabel("KeyPair");
             var keyPairs = keyPair.SepBy(String(","));
             var jobject = from pairs in keyPairs.Between(Char('{'), Char('}'))
                           select (object)pairs.ToDictionary(t => t.Item1, t => t.Item2);
@@ -424,26 +494,23 @@ namespace GosuParser.Tests
 
             var jnumber = from i in IntParser()
                           select (object)i;
-
-            jvalue = new[]
+            assignment(new[]
             {
-                jstring.Select(x => (object)x),
+                jstring.Select(x => (object) x),
                 jnumber,
                 jobject,
                 jarray,
-                String("true").Select(x => (object)true),
-                String("false").Select(x => (object)false),
-                String("null").Select(x => (object)null)
-            }.Choice().WithLabel("value");
+                String("true").Select(x => (object) true),
+                String("false").Select(x => (object) false),
+                String("null").Select(x => (object) null)
+            }.Choice().WithLabel("value"));
 
-            var run = jvalue.Run("{x:5,a:\"hello\"}");
-            Trace.WriteLine(run);
-            Assert.True(run.IsSuccess);
-            var success = Assert.IsType<Success<object>>(run);
-            var result = success.Result;
-            Assert.NotNull(result);
-            var o = Assert.IsType<Dictionary<string, object>>(result);
-            Assert.Equal(2, o.Count);
+            AssertSuccess(jobject, "{\"x\":5,\"a\":\"hello\"}", result =>
+            {
+                Assert.NotNull(result);
+                var o = Assert.IsType<Dictionary<string, object>>(result);
+                Assert.Equal(2, o.Count);
+            });
         }
         
 
@@ -454,9 +521,15 @@ namespace GosuParser.Tests
             Assert.Equal(failureText, failure2.ToString());
         }
 
+        private static void AssertSuccess<T>(Parser<T> parser, string input, Action<T> expectation)
+        {
+            AssertSuccess(parser, input, "", expectation);
+        }
+
         private static void AssertSuccess<T>(Parser<T> parser, string input, string remainingInput, Action<T> expectation)
         {
-            var success = Assert.IsType<Success<T>>(parser.Run(input));
+            var run = parser.Run(input);
+            var success = Assert.IsType<Success<T>>(run);
             Assert.True(success.IsSuccess);
             AssertRemainingInput(remainingInput, success);
 
@@ -466,7 +539,7 @@ namespace GosuParser.Tests
         private static void AssertRemainingInput<T>(string remainingInput, Success<T> success)
         {
             var input = success.Input;
-            var currentLine = input.CurrentLine.Substring(input.Position.Column);
+            var currentLine = input.Position.RemainingInput;
             Assert.Equal(remainingInput, currentLine);
         }
     }

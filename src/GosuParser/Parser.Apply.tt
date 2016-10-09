@@ -17,17 +17,17 @@ namespace GosuParser
             from func in funcParser
             from x in xParser
             select func(x);
-		<# 
-		for(var i = 1; i < 8; i++) { 
-			var typeParams = string.Join(", ", Enumerable.Range(2, i).Select(x => "T" + x));
-			var funcParams = string.Join(", ", Enumerable.Range(2, i).Select(x => "t" + x));
-		#>
+        <#
+        for(var i = 1; i < 8; i++) {
+            var typeParams = string.Join(", ", Enumerable.Range(2, i).Select(x => "T" + x));
+            var funcParams = string.Join(", ", Enumerable.Range(2, i).Select(x => "t" + x));
+        #>
 
-		public static Parser<Func<<#= typeParams #>, TResult>> Apply<T1, <#= typeParams #>, TResult>(this Parser<Func<T1, <#= typeParams #>, TResult>> funcParser, Parser<T1> xParser) =>
-		    from func in funcParser
+        public static Parser<Func<<#= typeParams #>, TResult>> Apply<T1, <#= typeParams #>, TResult>(this Parser<Func<T1, <#= typeParams #>, TResult>> funcParser, Parser<T1> xParser) =>
+            from func in funcParser
             from x in xParser
-            select new Func<<#= typeParams #>, TResult>((<#= funcParams #>) => func(x, <#= funcParams #>));            
-		<# } #>
+            select new Func<<#= typeParams #>, TResult>((<#= funcParams #>) => func(x, <#= funcParams #>));
+        <# } #>
 
-	}
+    }
 }
