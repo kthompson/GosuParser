@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>A parser combinator library for .NET Core</Description>
+    <AssemblyTitle>GosuParser</AssemblyTitle>
+    <VersionPrefix>1.0.1</VersionPrefix>
+    <Authors>Kevin Thompson</Authors>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <DebugType>portable</DebugType>
+    <AssemblyName>GosuParser</AssemblyName>
+    <PackageId>GosuParser</PackageId>
+    <PackageTags>parser;compiler;c#</PackageTags>
+    <PackageReleaseNotes>Added support for .NET Core</PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/kthompson/GosuParser</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/kthompson/GosuParser/blob/master/LICENSE</PackageLicenseUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/kthompson/GosuParser</RepositoryUrl>
+    <NetStandardImplicitPackageVersion>1.6.0</NetStandardImplicitPackageVersion>
+    <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
+    <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
+    <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+
+</Project>

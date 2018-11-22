@@ -1,19 +1,18 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "GosuParser", "src\GosuParser\GosuParser.xproj", "{5AE378CE-987A-4E3E-BB5A-68CCEC0233AA}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{6132D2FA-996F-47FB-98C0-847DD8AF5852}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
-		global.json = global.json
 		LICENSE = LICENSE
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "GosuParser.Tests", "tests\GosuParser.Tests\GosuParser.Tests.xproj", "{9081BDEE-9E5A-4313-A420-ADDC0E6BB809}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GosuParser", "src\GosuParser\GosuParser.csproj", "{5AE378CE-987A-4E3E-BB5A-68CCEC0233AA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GosuParser.Tests", "tests\GosuParser.Tests\GosuParser.Tests.csproj", "{9081BDEE-9E5A-4313-A420-ADDC0E6BB809}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,5 +31,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C7BDB12C-FA20-48E9-99D7-70F7E0689067}
 	EndGlobalSection
 EndGlobal

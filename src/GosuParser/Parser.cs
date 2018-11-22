@@ -1,174 +1,186 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using GosuParser.Input;
 
 namespace GosuParser
 {
-    public delegate Result<T> Parser<T>(InputState InputState);
-
-    public static partial class Parser
+    public class Parser<I, T>
     {
-        public static Parser<T> Create<T>(Func<InputState, Result<T>> fn) => input => fn(input);
+        private readonly Func<Reader<I>, Result> func;
 
-        public static Parser<T> Choice<T>(this IEnumerable<Parser<T>> items) =>
-            items.Aggregate((parser, parser1) => parser.OrElse(parser1));
+        public Parser(Func<Reader<I>, Result> func)
+        {
+            this.func = func;
+        }
 
+        public virtual Result Run(Reader<I> inputState) => func(inputState);
 
-        public static Result<T> Run<T>(this Parser<T> parser, InputState input) => parser(input);
+        public Parser<I, TResult> SelectMany<TResult>(Func<T, Parser<I, TResult>> f) =>
+            new Parser<I, TResult>(input => this.Run(input).Match(FromFailure<TResult>,
+                (value1, remainingInput) => f(value1).Run(remainingInput)));
 
-        public static Result<T> Run<T>(this Parser<T> parser, string input) =>
-            parser(InputState.FromString(input));
-        
-        public static Parser<Tuple<T1, T2>> AndThen<T1, T2>(this Parser<T1> parser, Parser<T2> parser2) =>
-            from p1 in parser
-            from p2 in parser2
-            select Tuple.Create(p1, p2);
-
-        public static Parser<Tuple<T1, T2, T3>> AndThen<T1, T2, T3>(this Parser<Tuple<T1, T2>> parser, Parser<T3> parser2) =>
-            from p1 in parser
-            from p2 in parser2
-            select Tuple.Create(p1.Item1, p1.Item2, p2);
-
-        public static Parser<Tuple<T1, T2, T3, T4>> AndThen<T1, T2, T3, T4>(
-            this Parser<Tuple<T1, T2, T3>> parser, Parser<T4> parser2) =>
-                from p1 in parser
-                from p2 in parser2
-                select Tuple.Create(p1.Item1, p1.Item2, p1.Item3, p2);
-
-        public static Parser<T> OrElse<T>(this Parser<T> parser, Parser<T> parser2) =>
-            input => parser(input).Match(
-                _ => parser2(input),
-                Result.Success);
-
-        public static Parser<TResult> Select<T, TResult>(
-            this Parser<T> parser,
-            Func<T, TResult> func) =>
-                Bind(parser, p =>
-                    Return(func(p)));
-
-        public static Parser<TResult> Cast<T, TResult>(this Parser<T> parser) =>
-            parser.Select(t => (TResult)(object) t);
-
-        public static Parser<TResult> SelectMany<T, TParser, TResult>(
-            this Parser<T> parser,
-            Func<T, Parser<TParser>> parserSelector,
+        public Parser<I, TResult> SelectMany<TParser, TResult>(Func<T, Parser<I, TParser>> parserSelector,
             Func<T, TParser, TResult> resultSelector) =>
-                Bind(parser, t =>
-                    Bind(parserSelector(t), tp =>
-                        Return(resultSelector(t, tp))));
+            this.SelectMany(t => parserSelector(t).SelectMany(tp => Parser<I, TResult>.Pure(resultSelector(t, tp))));
 
-        public static Parser<TResult> Bind<T, TResult>(this Parser<T> p, Func<T, Parser<TResult>> f) =>
-            input => p(input)
-                .Match(
-                    failure => Result.FromFailure<T, TResult>(failure),
-                    (value1, remainingInput) => f(value1)(remainingInput));
+        public Parser<I, TResult> Select<TResult>(Func<T, TResult> f) =>
+            this.SelectMany(value => Parser<I, TResult>.Pure(f(value)));
 
-        //returnP <>
-        public static Parser<T> Return<T>(this T obj) => input => Result.Success(obj, input);
+        public Parser<I, T> OrElse(Parser<I, T> parser2) =>
+            new Parser<I, T>(input => Run(input).Match(
+                _ => parser2.Run(input),
+                (value, reader) => new Success(value, reader)));
 
-        private static Func<Parser<T1>, Parser<T2>> Lift2<T1, T2>(Func<T1, T2> f) =>
-            pT1 => f.Return().Apply(pT1);
-
-        public static Func<Parser<T1>, Parser<T2>, Parser<T3>> Lift2<T1, T2, T3>(Func<T1, T2, T3> f) =>
-            (pT1, pT2) => f.Return().Apply(pT1).Apply(pT2);
-
-        // sequence
-        public static Parser<IEnumerable<T>> ToSequence<T>(this IEnumerable<Parser<T>> enumerable)
+        public Parser<I, IEnumerable<T>> ZeroOrOne()
         {
-            var consP = Lift2<T, IEnumerable<T>, IEnumerable<T>>(Extensions.Cons);
-            var parsers = enumerable as ICollection<Parser<T>>;
-            var list = parsers ?? enumerable.ToList();
+            var some = this.Select(x => new T[] { x });
+            var none = (new T[] { }).Pure();
 
-            if (list.Count == 0)
-                return ((IEnumerable<T>) new List<T>()).Return();
-
-            var head = list.First();
-            var tail = list.Skip(1);
-
-            return consP(head, tail.ToSequence());
+            return some
+                .OrElse(none)
+                .Select(x => (IEnumerable<T>)x);
         }
 
-
-        private static IEnumerable<T> Yielder<T>(T head, IEnumerator<T> tail)
-        {
-            yield return head;
-
-            using (tail)
-            {
-                while (tail.MoveNext())
-                {
-                    yield return tail.Current;
-                }
-            }
-        }
-        private static Success<IEnumerable<T>> ParseZeroOrMore<T>(Parser<T> parser, InputState input) =>
-            parser
-                .Run(input)
+        private Parser<I, IEnumerable<T>>.Success ParseZeroOrMore(Reader<I> input) =>
+            Run(input)
                 .Match(
-                    _ => new Success<IEnumerable<T>>(new List<T>(), input),
+                    _ => new Parser<I, IEnumerable<T>>.Success(new List<T>(), input),
                     (firstValue, inputAfterFirstParse) =>
                     {
-                        var result2 = ParseZeroOrMore(parser, inputAfterFirstParse);
-                        var values = firstValue.Cons(result2.Result);
+                        var result2 = ParseZeroOrMore(inputAfterFirstParse);
+                        var values = firstValue.Cons(result2.Value);
 
-                        return new Success<IEnumerable<T>>(values, result2.Input);
+                        return new Parser<I, IEnumerable<T>>.Success(values, result2.Input);
                     });
 
-        public static Parser<IEnumerable<T>> ZeroOrMore<T>(this Parser<T> parser) =>
-            input => ParseZeroOrMore(parser, input);
+        public Parser<I, IEnumerable<T>> ZeroOrMore() =>
+            new Parser<I, IEnumerable<T>>(this.ParseZeroOrMore);
 
-        public static Parser<IEnumerable<T>> OneOrMore<T>(this Parser<T> parser) =>
-            from head in parser
-            from tail in parser.ZeroOrMore()
+        public Parser<I, IEnumerable<T>> OneOrMore() =>
+            from head in this
+            from tail in this.ZeroOrMore()
             select head.Cons(tail);
 
-        public static Parser<IEnumerable<T>> Many<T>(this Parser<T> parser) => 
-            OneOrMore(parser);
+        public Parser<I, IEnumerable<T>> Many() => OneOrMore();
 
-        public static Parser<T?> Optional<T>(this Parser<T> parser) where T : struct
+        public Parser<I, T> Where(Func<T, bool> predicate) =>
+            new Parser<I, T>(input => this.Run(input)
+                .Match(
+                    failure => failure,
+                    (value, newState) =>
+                        predicate(value)
+                            ? OfSuccess(value, newState)
+                            : OfFailure("where predicate", "failed predicate")));
+
+        public Parser<I, Unit> Skip() =>
+            this.Select(_ => Unit.Default);
+
+        public Parser<I, T> TakeLeft<T2>(Parser<I, T2> parser2) =>
+            from t in this
+            from _ in parser2
+            select t;
+
+        public Parser<I, T2> TakeRight<T2>(Parser<I, T2> parser2) =>
+            from _ in this
+            from t in parser2
+            select t;
+
+        public Parser<I, T> Between<T2, T3>(Parser<I, T2> left, Parser<I, T3> right) =>
+            from _ in left
+            from t in this
+            from __ in right
+            select (T)t;
+
+        public Parser<I, IEnumerable<T>> SepBy1<T2>(Parser<I, T2> sep)
         {
-            var some = parser.Select(x => new T?(x));
-            var none = default(T?).Return();
+            var manySepThenP = sep.TakeRight(this).ZeroOrMore();
 
-            return some.OrElse(none);
+            return this.AndThen(manySepThenP).Select(tuple => (IEnumerable<T>)tuple.Item1.Cons(tuple.Item2));
         }
 
-        public static Parser<T1> TakeLeft<T1, T2>(this Parser<T1> parser, Parser<T2> parser2) =>
-            from t in parser.AndThen(parser2)
-            select t.Item1;
+        public Parser<I, IEnumerable<T>> SepBy<T2>(Parser<I, T2> sep) =>
+            this.SepBy1(sep)
+                .OrElse(((IEnumerable<T>)new T[] { }).Pure());
 
-        public static Parser<T2> TakeRight<T1, T2>(this Parser<T1> parser, Parser<T2> parser2) =>
-            from t in parser.AndThen(parser2)
-            select t.Item2;
+        public Parser<I, T> WithLabel(string label) =>
+            new Parser<I, T>(input => Run(input)
+                .Match<Result>(failure => new Failure(label, failure.FailureText, failure.Position), ToSuccess));
 
-        public static Parser<T1> Between<T1, T2, T3>(this Parser<T1> parser, Parser<T2> left, Parser<T3> right) =>
-            left.TakeRight(parser)
-                .TakeLeft(right);
+        public static Parser<I, T> Pure(T value) => new Parser<I, T>(reader => new Success(value, reader));
 
-        public static Parser<IEnumerable<T1>> SepBy1<T1, T2>(this Parser<T1> parser, Parser<T2> sep)
+        private static Success ToSuccess(T value, Reader<I> reader) => new Success(value, reader);
+
+        private static Parser<I, TResult>.Result FromFailure<TResult>(Failure failure) =>
+            new Parser<I, TResult>.Failure(failure.Label, failure.FailureText, failure.Position);
+
+        public static implicit operator Parser<I, T>(PureValue<T> value) => value.Parser<I>();
+
+        public static Result OfSuccess(T value, Reader<I> input) => new Success(value, input);
+
+        public static Result OfFailure(string label, string failureText, Position position = null) => new Failure(label, failureText, position);
+
+        public abstract class Result
         {
-            var manySepThenP =
-                ZeroOrMore(
-                    TakeRight(sep, parser));
+            public abstract bool IsSuccess { get; }
 
-            return
-                from tuple in parser.AndThen(manySepThenP)
-                let head = tuple.Item1
-                let tail = tuple.Item2
-                select head.Cons(tail);
+            public abstract TResult Match<TResult>(Func<Failure, TResult> failureFunc,
+                Func<T, Reader<I>, TResult> successFunc);
         }
 
-        public static Parser<IEnumerable<T1>> SepBy<T1, T2>(this Parser<T1> parser, Parser<T2> sep) =>
-            parser.SepBy1(sep)
-                .OrElse(((IEnumerable<T1>) new T1[] {}).Return());
+        public sealed class Success : Result
+        {
+            public Success(T value, Reader<I> input)
+            {
+                this.Value = value;
+                this.Input = input;
+            }
 
+            public T Value { get; }
+            public Reader<I> Input { get; }
+            public override bool IsSuccess => true;
 
-        public static Parser<T1> WithLabel<T1>(string label, Parser<T1> parser) =>
-            parser.WithLabel(label);
+            public override TResult Match<TResult>(Func<Failure, TResult> failureFunc, Func<T, Reader<I>, TResult> successFunc)
+            {
+                return successFunc(this.Value, this.Input);
+            }
 
-        public static Parser<T1> WithLabel<T1>(this Parser<T1> parser, string label) =>
-            input => parser(input)
-                .Match(failure => Result.Failure<T1>(label, failure.FailureText, failure.Position),
-                    Result.Success);
+            public override string ToString() => $"Success: {Value}";
+        }
+
+        public sealed class Failure : Result
+        {
+            public string Label { get; }
+            public string FailureText { get; }
+            public Position Position { get; }
+            public override bool IsSuccess => false;
+
+            public override TResult Match<TResult>(Func<Failure, TResult> failureFunc, Func<T, Reader<I>, TResult> successFunc)
+            {
+                return failureFunc(this);
+            }
+
+            public Failure(string label, string failureText, Position position = null)
+            {
+                this.Label = label;
+                this.FailureText = failureText;
+                this.Position = position;
+            }
+
+            public override string ToString()
+            {
+                var label = string.IsNullOrEmpty(Label) ? ":" : " " + Label;
+
+                if (this.Position != null)
+                {
+                    var colPos = this.Position.Column;
+                    var linePos = this.Position.Line;
+                    var indent = new string('-', colPos);
+
+                    return $"Line:{linePos} Col:{colPos} Error parsing{label}\n{this.Position.LongString()} {this.FailureText}";
+                }
+
+                return $"Error parsing{label}: {this.FailureText}";
+            }
+        }
     }
 }

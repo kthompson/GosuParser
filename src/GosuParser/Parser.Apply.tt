@@ -13,13 +13,13 @@ namespace GosuParser
     public static partial class Parser
     {
         // applyP <*>
-        public static Parser<TResult> Apply<T1, TResult>(this Parser<Func<T1, TResult>> funcParser, Parser<T1> xParser) =>
+        public static Parser<I, TResult> Apply<I, T1, TResult>(this Parser<Func<T1, TResult>> funcParser, Parser<T1> xParser) =>
             from func in funcParser
             from x in xParser
             select func(x);
         <#
         for(var i = 1; i < 8; i++) {
-            var typeParams = string.Join(", ", Enumerable.Range(2, i).Select(x => "T" + x));
+            var typeParams = string.Join(",  ", Enumerable.Range(2, i).Select(x => "T" + x));
             var funcParams = string.Join(", ", Enumerable.Range(2, i).Select(x => "t" + x));
         #>
 

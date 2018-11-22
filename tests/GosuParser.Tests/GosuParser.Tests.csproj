@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <DebugType>portable</DebugType>
+    <AssemblyName>GosuParser.Tests</AssemblyName>
+    <PackageId>GosuParser.Tests</PackageId>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <PackageTargetFallback>$(PackageTargetFallback);dotnet5.4;portable-net451+win8</PackageTargetFallback>
+    <RuntimeFrameworkVersion>2.1.0</RuntimeFrameworkVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\GosuParser\GosuParser.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="BenchmarkDotNet" Version="0.11.2" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+  </ItemGroup>
+
+</Project>

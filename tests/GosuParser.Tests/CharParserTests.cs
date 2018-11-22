@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using GosuParser.Input;
 using Xunit;
-using static GosuParser.Parser;
+using static GosuParser.CharacterParsers;
 
 namespace GosuParser.Tests
 {
@@ -14,7 +15,7 @@ namespace GosuParser.Tests
             var parser = Char('A');
 
             AssertSuccess(parser, "ABC", "BC", c => Assert.Equal('A', c));
-            AssertFailure(parser, "ZBC", "Line:0 Col:0 Error parsing 'A'\nZBC\n^ Unexpected 'Z'");
+            AssertFailure(parser, "ZBC", "Line:1 Col:1 Error parsing 'A'\nZBC\n^ Unexpected 'Z'");
         }
 
         [Fact]
@@ -30,8 +31,8 @@ namespace GosuParser.Tests
                 Assert.Equal('B', tuple.Item2);
             });
 
-            AssertFailure(parseAThenB, "ZBC", "Line:0 Col:0 Error parsing 'A'\nZBC\n^ Unexpected 'Z'");
-            AssertFailure(parseAThenB, "AZC", "Line:0 Col:1 Error parsing 'B'\nAZC\n-^ Unexpected 'Z'");
+            AssertFailure(parseAThenB, "ZBC", "Line:1 Col:1 Error parsing 'A'\nZBC\n^ Unexpected 'Z'");
+            AssertFailure(parseAThenB, "AZC", "Line:1 Col:2 Error parsing 'B'\nAZC\n ^ Unexpected 'Z'");
         }
 
         [Fact]
@@ -40,10 +41,10 @@ namespace GosuParser.Tests
             var parseA = Char('A');
             var parseB = Char('B');
             var parseAOrElseB = parseA.OrElse(parseB);
-            
+
             AssertSuccess(parseAOrElseB, "AZZ", "ZZ", value => Assert.Equal('A', value));
             AssertSuccess(parseAOrElseB, "BZZ", "ZZ", value => Assert.Equal('B', value));
-            AssertFailure(parseAOrElseB, "CZZ", "Line:0 Col:0 Error parsing 'B'\nCZZ\n^ Unexpected 'C'");
+            AssertFailure(parseAOrElseB, "CZZ", "Line:1 Col:1 Error parsing 'B'\nCZZ\n^ Unexpected 'C'");
         }
 
         [Fact]
@@ -67,8 +68,8 @@ namespace GosuParser.Tests
                 Assert.Equal('C', tuple.Item2);
             });
 
-            AssertFailure(aAndThenBorC, "QBZ", "Line:0 Col:0 Error parsing 'A'\nQBZ\n^ Unexpected 'Q'");
-            AssertFailure(aAndThenBorC, "AQZ", "Line:0 Col:1 Error parsing 'C'\nAQZ\n-^ Unexpected 'Q'");
+            AssertFailure(aAndThenBorC, "QBZ", "Line:1 Col:1 Error parsing 'A'\nQBZ\n^ Unexpected 'Q'");
+            AssertFailure(aAndThenBorC, "AQZ", "Line:1 Col:2 Error parsing 'C'\nAQZ\n ^ Unexpected 'Q'");
         }
 
         [Fact]
@@ -77,13 +78,13 @@ namespace GosuParser.Tests
             var parseLowercase = AnyOf("abcdefghijklmnopqrstuvwxyz");
 
             AssertSuccess(parseLowercase, "aBC", "BC", c => Assert.Equal('a', c));
-            AssertFailure(parseLowercase, "ABC", "Line:0 Col:0 Error parsing any of [abcdefghijklmnopqrstuvwxyz]\nABC\n^ Unexpected 'A'");
+            AssertFailure(parseLowercase, "ABC", "Line:1 Col:1 Error parsing any of [abcdefghijklmnopqrstuvwxyz]\nABC\n^ Unexpected 'A'");
 
             var parseDigit = AnyOf("0123456789");
 
             AssertSuccess(parseDigit, "1ABC", "ABC", c => Assert.Equal('1', c));
             AssertSuccess(parseDigit, "9ABC", "ABC", c => Assert.Equal('9', c));
-            AssertFailure(parseDigit, "|ABC", "Line:0 Col:0 Error parsing any of [0123456789]\n|ABC\n^ Unexpected '|'");
+            AssertFailure(parseDigit, "|ABC", "Line:1 Col:1 Error parsing any of [0123456789]\n|ABC\n^ Unexpected '|'");
         }
 
         [Fact]
@@ -95,20 +96,19 @@ namespace GosuParser.Tests
                 parseDigit
                     .AndThen(parseDigit)
                     .AndThen(parseDigit)
-                    .Select(x => new string(new char[] {x.Item1, x.Item2, x.Item3}));
+                    .Select(x => new string(new char[] { x.Item1, x.Item2, x.Item3 }));
 
             AssertSuccess(parseThreeDigitsAsStr, "123A", "A", s => Assert.Equal("123", s));
 
             var parseThreeDigitsAsInt = parseThreeDigitsAsStr.Select(int.Parse);
 
             AssertSuccess(parseThreeDigitsAsInt, "123A", "A", i => Assert.Equal(123, i));
-
         }
 
         [Fact]
         public void SequenceTest()
         {
-            var parsers = new List<Parser<char>>()
+            var parsers = new List<Parser<char, char>>()
             {
                 Char('A'),
                 Char('B'),
@@ -119,7 +119,7 @@ namespace GosuParser.Tests
 
             AssertSuccess(combined, "ABCD", "D", list =>
             {
-                Assert.Collection(list, 
+                Assert.Collection(list,
                     c => Assert.Equal('A', c),
                     c => Assert.Equal('B', c),
                     c => Assert.Equal('C', c));
@@ -130,10 +130,10 @@ namespace GosuParser.Tests
         public void StringParserTest()
         {
             var parseABC = String("ABC");
-        
+
             AssertSuccess(parseABC, "ABCD", "D", str => Assert.Equal("ABC", str));
-            AssertFailure(parseABC, "A|CDE", "Line:0 Col:1 Error parsing ABC\nA|CDE\n-^ Unexpected '|'");
-            AssertFailure(parseABC, "AB|DE", "Line:0 Col:2 Error parsing ABC\nAB|DE\n--^ Unexpected '|'");
+            AssertFailure(parseABC, "A|CDE", "Line:1 Col:2 Error parsing ABC\nA|CDE\n ^ Unexpected '|'");
+            AssertFailure(parseABC, "AB|DE", "Line:1 Col:3 Error parsing ABC\nAB|DE\n  ^ Unexpected '|'");
         }
 
         [Fact]
@@ -162,7 +162,7 @@ namespace GosuParser.Tests
                     c => Assert.Equal('A', c));
             });
 
-            AssertSuccess(manyA, "|BCD", "|BCD", list => Assert.Collection(list));
+            AssertSuccess(manyA, "|BCD", "|BCD", Assert.Empty);
         }
 
         [Fact]
@@ -183,16 +183,16 @@ namespace GosuParser.Tests
                     c => Assert.Equal("AB", c));
             });
 
-            AssertSuccess(manyA, "ZCD", "ZCD", list => Assert.Collection(list));
-            AssertSuccess(manyA, "AZCD", "AZCD", list => Assert.Collection(list));
+            AssertSuccess(manyA, "ZCD", "ZCD", Assert.Empty);
+            AssertSuccess(manyA, "AZCD", "AZCD", Assert.Empty);
         }
 
         [Fact]
         public void WhitespaceParserTest()
         {
-            var manyA = Spaces();
+            var manyA = Spaces;
 
-            AssertSuccess(manyA, "ABC", "ABC", list => Assert.Collection(list));
+            AssertSuccess(manyA, "ABC", "ABC", Assert.Empty);
 
             AssertSuccess(manyA, " ABC", "ABC", list =>
             {
@@ -243,22 +243,22 @@ namespace GosuParser.Tests
                     c => Assert.Equal('4', c));
             });
 
-            AssertFailure(digits, "ABC", "Line:0 Col:0 Error parsing any of [0123456789]\nABC\n^ Unexpected 'A'");
+            AssertFailure(digits, "ABC", "Line:1 Col:1 Error parsing any of [0123456789]\nABC\n^ Unexpected 'A'");
         }
 
         [Fact]
         public void IntParserTest()
         {
-            var pint = IntParser();
+            var pint = IntParser;
 
             AssertSuccess(pint, "1ABC", "ABC", i => Assert.Equal(1, i));
             AssertSuccess(pint, "12BC", "BC", i => Assert.Equal(12, i));
             AssertSuccess(pint, "123C", "C", i => Assert.Equal(123, i));
             AssertSuccess(pint, "1234", "", i => Assert.Equal(1234, i));
 
-            AssertFailure(pint, "ABC", "Line:0 Col:0 Error parsing digit\nABC\n^ Unexpected 'A'");
+            AssertFailure(pint, "ABC", "Line:1 Col:1 Error parsing digit\nABC\n^ Unexpected 'A'");
 
-            AssertSuccess(pint,"-123C" , "C", i => Assert.Equal(-123, i)); 
+            AssertSuccess(pint, "-123C", "C", i => Assert.Equal(-123, i));
         }
 
         [Fact]
@@ -291,14 +291,13 @@ namespace GosuParser.Tests
             AssertSuccess(digitThenSemicolon, "1", "", c => Assert.Equal('1', c));
         }
 
-
         [Fact]
         public void TakeLeftTest2()
         {
             var ab = String("AB");
             var cd = String("CD");
 
-            var abCd = ab.TakeLeft(Spaces()).AndThen(cd);
+            var abCd = ab.TakeLeft(Spaces).AndThen(cd);
 
             AssertSuccess(abCd, "AB \t\nCD", "", tuple =>
             {
@@ -311,10 +310,10 @@ namespace GosuParser.Tests
         public void BetweenTest()
         {
             var quote = Char('"');
-            var quotedInt = IntParser().Between(quote, quote);
+            var quotedInt = IntParser.Between(quote, quote);
 
             AssertSuccess(quotedInt, "\"1234\"", "", i => Assert.Equal(1234, i));
-            AssertFailure(quotedInt, "1234", "Line:0 Col:0 Error parsing '\"'\n1234\n^ Unexpected '1'");
+            AssertFailure(quotedInt, "1234", "Line:1 Col:1 Error parsing '\"'\n1234\n^ Unexpected '1'");
         }
 
         [Fact]
@@ -339,13 +338,13 @@ namespace GosuParser.Tests
 
             AssertSuccess(oneOrMoreDigitList, "1,2,3;", ";", coll =>
             {
-                Assert.Collection(coll, 
-                    c => Assert.Equal('1', c), 
-                    c => Assert.Equal('2', c), 
+                Assert.Collection(coll,
+                    c => Assert.Equal('1', c),
+                    c => Assert.Equal('2', c),
                     c => Assert.Equal('3', c));
             });
 
-            AssertFailure(oneOrMoreDigitList, "Z;", "Line:0 Col:0 Error parsing any of [0123456789]\nZ;\n^ Unexpected 'Z'");
+            AssertFailure(oneOrMoreDigitList, "Z;", "Line:1 Col:1 Error parsing any of [0123456789]\nZ;\n^ Unexpected 'Z'");
         }
 
         [Fact]
@@ -375,7 +374,7 @@ namespace GosuParser.Tests
                     c => Assert.Equal('3', c));
             });
 
-            AssertSuccess(zeroOrMoreDigitList, "Z;", "Z;", coll => Assert.Collection(coll));
+            AssertSuccess(zeroOrMoreDigitList, "Z;", "Z;", Assert.Empty);
         }
 
         [Fact]
@@ -385,29 +384,26 @@ namespace GosuParser.Tests
 
             var result = parseDigit.Run("|ABC").ToString();
 
-            Assert.Equal("Line:0 Col:0 Error parsing digit\n|ABC\n^ Unexpected '|'", result);
+            Assert.Equal("Line:1 Col:1 Error parsing digit\n|ABC\n^ Unexpected '|'", result);
         }
 
         [Fact]
         public void TestFailureResult()
         {
-            var failure = Result.Failure<int>("", "unexpected |", new Position(
-                "123 ab|cd", 1, 6));
+            var failure = new Parser<char, int>.Failure("", "unexpected |", new SimplePosition("123 ab|cd", 1, 6));
 
             var text = failure.ToString();
-            Assert.Equal("Line:1 Col:6 Error parsing:\n123 ab|cd\n------^ unexpected |", text);
+            Assert.Equal("Line:1 Col:6 Error parsing:\n123 ab|cd\n     ^ unexpected |", text);
         }
 
         [Fact]
         public void TestFailureResult2()
         {
-            var failure = Result.Failure<int>("taco", "unexpected |", new Position(
-                "123 ab|cd", 1, 6));
+            var failure = new Parser<char, int>.Failure("taco", "unexpected |", new SimplePosition("123 ab|cd", 1, 6));
 
             var text = failure.ToString();
-            Assert.Equal("Line:1 Col:6 Error parsing taco\n123 ab|cd\n------^ unexpected |", text);
+            Assert.Equal("Line:1 Col:6 Error parsing taco\n123 ab|cd\n     ^ unexpected |", text);
         }
-
 
         [Fact]
         public void BasicStringTest()
@@ -415,17 +411,14 @@ namespace GosuParser.Tests
             var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many()
                           select new string(chars.ToArray());
 
-
             AssertSuccess(jstring, @"hello", res => Assert.Equal("hello", res));
         }
-
 
         [Fact]
         public void JsonStringTest()
         {
             var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
                           select new string(chars.ToArray());
-
 
             AssertSuccess(jstring, @"""hello""", res => Assert.Equal("hello", res));
         }
@@ -451,7 +444,6 @@ namespace GosuParser.Tests
         [Fact]
         public void JsonKeyPairsTest()
         {
-
             var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
                           select new string(chars.ToArray());
             var key = jstring.WithLabel("key");
@@ -477,8 +469,8 @@ namespace GosuParser.Tests
         [Fact]
         public void JsonTest()
         {
-            Action<Parser<object>> assignment;
-            Parser<object> jvalue = CreateParserForwardedToRef(out assignment);
+            Action<Parser<char, object>> assignment;
+            Parser<char, object> jvalue = CreateParserForwardedToRef(out assignment);
 
             var jstring = from chars in Satisfy(c => c != '"' && c != '\\').Many().Between(Char('"'), Char('"'))
                           select new string(chars.ToArray());
@@ -492,7 +484,7 @@ namespace GosuParser.Tests
             var jarray = from value in jvalue.SepBy(Char(',')).Between(Char('['), Char(']'))
                          select (object)value.ToArray();
 
-            var jnumber = from i in IntParser()
+            var jnumber = from i in IntParser
                           select (object)i;
             assignment(new[]
             {
@@ -512,35 +504,27 @@ namespace GosuParser.Tests
                 Assert.Equal(2, o.Count);
             });
         }
-        
 
-        private static void AssertFailure<T>(Parser<T> parseAOrElseB, string input, string failureText)
+        private static void AssertFailure<T>(Parser<char, T> parseAOrElseB, string input, string failureText)
         {
-            var failure2 = Assert.IsType<Failure<T>>(parseAOrElseB.Run(input));
+            var failure2 = Assert.IsType<Parser<char, T>.Failure>(parseAOrElseB.Run(input));
             Assert.False(failure2.IsSuccess);
             Assert.Equal(failureText, failure2.ToString());
         }
 
-        private static void AssertSuccess<T>(Parser<T> parser, string input, Action<T> expectation)
+        private static void AssertSuccess<T>(Parser<char, T> parser, string input, Action<T> expectation)
         {
             AssertSuccess(parser, input, "", expectation);
         }
 
-        private static void AssertSuccess<T>(Parser<T> parser, string input, string remainingInput, Action<T> expectation)
+        private static void AssertSuccess<T>(Parser<char, T> parser, string input, string remainingInput, Action<T> expectation)
         {
             var run = parser.Run(input);
-            var success = Assert.IsType<Success<T>>(run);
+            var success = Assert.IsType<Parser<char, T>.Success>(run);
             Assert.True(success.IsSuccess);
-            AssertRemainingInput(remainingInput, success);
+            Assert.Equal(remainingInput, success.Input.GetRemainingInput());
 
-            expectation(success.Result);
-        }
-
-        private static void AssertRemainingInput<T>(string remainingInput, Success<T> success)
-        {
-            var input = success.Input;
-            var currentLine = input.Position.RemainingInput;
-            Assert.Equal(remainingInput, currentLine);
+            expectation(success.Value);
         }
     }
 }
