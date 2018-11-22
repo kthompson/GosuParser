@@ -387,10 +387,23 @@ namespace GosuParser.Tests
             Assert.Equal("Line:1 Col:1 Error parsing digit\n|ABC\n^ Unexpected '|'", result);
         }
 
+        private class PositionReader : Reader<char>
+        {
+            public PositionReader(string currentLine, int line, int column)
+            {
+                this.Position = new SimplePosition(currentLine, line, column);
+            }
+
+            public override char First => '0';
+            public override Reader<char> Rest => null;
+            public override bool AtEnd => true;
+            public override Position Position { get; }
+        }
+
         [Fact]
         public void TestFailureResult()
         {
-            var failure = new Parser<char, int>.Failure("", "unexpected |", new SimplePosition("123 ab|cd", 1, 6));
+            var failure = new Parser<char, int>.Failure("", "unexpected |", new PositionReader("123 ab|cd", 1, 6));
 
             var text = failure.ToString();
             Assert.Equal("Line:1 Col:6 Error parsing:\n123 ab|cd\n     ^ unexpected |", text);
@@ -399,7 +412,7 @@ namespace GosuParser.Tests
         [Fact]
         public void TestFailureResult2()
         {
-            var failure = new Parser<char, int>.Failure("taco", "unexpected |", new SimplePosition("123 ab|cd", 1, 6));
+            var failure = new Parser<char, int>.Failure("taco", "unexpected |", new PositionReader("123 ab|cd", 1, 6));
 
             var text = failure.ToString();
             Assert.Equal("Line:1 Col:6 Error parsing taco\n123 ab|cd\n     ^ unexpected |", text);
@@ -522,7 +535,7 @@ namespace GosuParser.Tests
             var run = parser.Run(input);
             var success = Assert.IsType<Parser<char, T>.Success>(run);
             Assert.True(success.IsSuccess);
-            Assert.Equal(remainingInput, success.Input.GetRemainingInput());
+            Assert.Equal(remainingInput, success.RemainingInput.GetRemainingInput());
 
             expectation(success.Value);
         }

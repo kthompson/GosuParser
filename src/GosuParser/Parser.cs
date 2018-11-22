@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net.Http.Headers;
 using GosuParser.Input;
 
 namespace GosuParser
@@ -50,7 +51,7 @@ namespace GosuParser
                         var result2 = ParseZeroOrMore(inputAfterFirstParse);
                         var values = firstValue.Cons(result2.Value);
 
-                        return new Parser<I, IEnumerable<T>>.Success(values, result2.Input);
+                        return new Parser<I, IEnumerable<T>>.Success(values, result2.RemainingInput);
                     });
 
         public Parser<I, IEnumerable<T>> ZeroOrMore() =>
@@ -70,7 +71,7 @@ namespace GosuParser
                     (value, newState) =>
                         predicate(value)
                             ? OfSuccess(value, newState)
-                            : OfFailure("where predicate", "failed predicate")));
+                            : OfFailure("where predicate", "failed predicate", newState)));
 
         public Parser<I, Unit> Skip() =>
             this.Select(_ => Unit.Default);
@@ -104,24 +105,23 @@ namespace GosuParser
 
         public Parser<I, T> WithLabel(string label) =>
             new Parser<I, T>(input => Run(input)
-                .Match<Result>(failure => new Failure(label, failure.FailureText, failure.Position), ToSuccess));
+                .Match<Result>(failure => new Failure(label, failure.FailureText, failure.RemainingInput), OfSuccess));
 
         public static Parser<I, T> Pure(T value) => new Parser<I, T>(reader => new Success(value, reader));
 
-        private static Success ToSuccess(T value, Reader<I> reader) => new Success(value, reader);
-
         private static Parser<I, TResult>.Result FromFailure<TResult>(Failure failure) =>
-            new Parser<I, TResult>.Failure(failure.Label, failure.FailureText, failure.Position);
+            new Parser<I, TResult>.Failure(failure.Label, failure.FailureText, failure.RemainingInput);
 
         public static implicit operator Parser<I, T>(PureValue<T> value) => value.Parser<I>();
 
         public static Result OfSuccess(T value, Reader<I> input) => new Success(value, input);
 
-        public static Result OfFailure(string label, string failureText, Position position = null) => new Failure(label, failureText, position);
+        public static Result OfFailure(string label, string failureText, Reader<I> remainingInput) => new Failure(label, failureText, remainingInput);
 
         public abstract class Result
         {
             public abstract bool IsSuccess { get; }
+            public abstract Reader<I> RemainingInput { get; }
 
             public abstract TResult Match<TResult>(Func<Failure, TResult> failureFunc,
                 Func<T, Reader<I>, TResult> successFunc);
@@ -129,19 +129,19 @@ namespace GosuParser
 
         public sealed class Success : Result
         {
-            public Success(T value, Reader<I> input)
+            public Success(T value, Reader<I> remainingInput)
             {
                 this.Value = value;
-                this.Input = input;
+                this.RemainingInput = remainingInput;
             }
 
             public T Value { get; }
-            public Reader<I> Input { get; }
+            public override Reader<I> RemainingInput { get; }
             public override bool IsSuccess => true;
 
             public override TResult Match<TResult>(Func<Failure, TResult> failureFunc, Func<T, Reader<I>, TResult> successFunc)
             {
-                return successFunc(this.Value, this.Input);
+                return successFunc(this.Value, this.RemainingInput);
             }
 
             public override string ToString() => $"Success: {Value}";
@@ -151,7 +151,7 @@ namespace GosuParser
         {
             public string Label { get; }
             public string FailureText { get; }
-            public Position Position { get; }
+            public override Reader<I> RemainingInput { get; }
             public override bool IsSuccess => false;
 
             public override TResult Match<TResult>(Func<Failure, TResult> failureFunc, Func<T, Reader<I>, TResult> successFunc)
@@ -159,24 +159,25 @@ namespace GosuParser
                 return failureFunc(this);
             }
 
-            public Failure(string label, string failureText, Position position = null)
+            public Failure(string label, string failureText, Reader<I> remainingInput)
             {
                 this.Label = label;
                 this.FailureText = failureText;
-                this.Position = position;
+                this.RemainingInput = remainingInput;
             }
 
             public override string ToString()
             {
                 var label = string.IsNullOrEmpty(Label) ? ":" : " " + Label;
 
-                if (this.Position != null)
+                var pos = this.RemainingInput.Position;
+                if (pos != null)
                 {
-                    var colPos = this.Position.Column;
-                    var linePos = this.Position.Line;
+                    var colPos = pos.Column;
+                    var linePos = pos.Line;
                     var indent = new string('-', colPos);
 
-                    return $"Line:{linePos} Col:{colPos} Error parsing{label}\n{this.Position.LongString()} {this.FailureText}";
+                    return $"Line:{linePos} Col:{colPos} Error parsing{label}\n{pos.LongString()} {this.FailureText}";
                 }
 
                 return $"Error parsing{label}: {this.FailureText}";

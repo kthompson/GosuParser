@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using GosuParser.Input;
 using StringReader = GosuParser.Input.StringReader;
 
 namespace GosuParser
@@ -11,6 +10,9 @@ namespace GosuParser
     {
         public static Parser<I, string> ToStringParser<I>(this Parser<I, IEnumerable<char>> p) =>
             p.Select(list => new string(list.ToArray()));
+
+        public static Parser<I, string> ToStringParser<I>(this Parser<I, Tuple<char, IEnumerable<char>>> p) =>
+            p.Select(list => new string(list.Item1.Cons(list.Item2).ToArray()));
 
         public static Parser<I, T> Choice<I, T>(this IEnumerable<Parser<I, T>> items) =>
             new Parser<I, T>(input =>
@@ -42,8 +44,6 @@ namespace GosuParser
 
                 return new Parser<I, T>.Failure($"Choice of [{failureLabel}]", failureText, input.Position);
             });
-
-        public static Parser<char, T>.Result Run<T>(this Parser<char, T> parser, Reader<char> input) => parser.Run(input);
 
         public static Parser<char, T>.Result Run<T>(this Parser<char, T> parser, string input) =>
             parser.Run(new StringReader(input));
@@ -101,11 +101,5 @@ namespace GosuParser
 
         public static Parser<I, Unit> Optional<I>(this Parser<I, Unit> parser) =>
             parser.OrElse(Unit.Default.Pure());
-
-        //public static Parser<Tuple<T1, TextSpan>> WithTextSpan<T1>(this Parser<T1> parser) =>
-        //    from start in Index
-        //    from t in parser
-        //    from end in Index
-        //    select Tuple.Create(t, TextSpan.FromBounds(start, end));
     }
 }

@@ -20,7 +20,7 @@ namespace GosuParser
     //        if (result.IsSuccess)
     //        {
     //            var success = (Success<T>)result;
-    //            return successFunc(success.Result, success.Input);
+    //            return successFunc(success.Result, success.RemainingInput);
     //        }
 
     //        var failure = (Failure<T>)result;
@@ -38,11 +38,11 @@ namespace GosuParser
     //    public Success(T result, Reader<char> input)
     //    {
     //        this.Result = result;
-    //        this.Input = input;
+    //        this.RemainingInput = input;
     //    }
 
     //    public T Result { get; }
-    //    public Reader<char> Input { get; }
+    //    public Reader<char> RemainingInput { get; }
     //    public override bool IsSuccess => true;
 
     //    public override string ToString() => $"Success: {Result}";

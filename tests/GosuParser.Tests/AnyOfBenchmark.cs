@@ -58,19 +58,19 @@ namespace GosuParser.Tests
         [Benchmark]
         public void DigitParsesOne()
         {
-            var result = GosuParser.ParserExtensions.Run(GetParser(), _initialInputState1);
+            var result = GetParser().Run(_initialInputState1);
         }
 
         [Benchmark]
         public void DigitParsesNine()
         {
-            var result = GosuParser.ParserExtensions.Run(GetParser(), _initialInputState9);
+            var result = GetParser().Run(_initialInputState9);
         }
 
         [Benchmark]
         public void DigitParsesA()
         {
-            var result = GosuParser.ParserExtensions.Run(GetParser(), _initialInputStateA);
+            var result = GetParser().Run(_initialInputStateA);
         }
     }
 }

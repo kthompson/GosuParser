@@ -1,9 +1,9 @@
+using static GosuParser.CharacterParsers;
+
 namespace GosuParser.Input
 {
     public class StringReader : Reader<char>
     {
-        public static char EndOfReader = (char)0x1a;
-
         public string Source { get; }
         public int Offset { get; }
 
