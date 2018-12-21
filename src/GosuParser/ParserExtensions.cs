@@ -42,7 +42,7 @@ namespace GosuParser
 
                 var failureText = errors.Select(x => x.FailureText).FirstOrDefault() ?? "";
 
-                return new Parser<I, T>.Failure($"Choice of [{failureLabel}]", failureText, input.Position);
+                return new Parser<I, T>.Failure($"Choice of [{failureLabel}]", failureText, input);
             });
 
         public static Parser<char, T>.Result Run<T>(this Parser<char, T> parser, string input) =>
